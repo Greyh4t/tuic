@@ -88,8 +88,40 @@ pub struct Config {
     )]
     pub gc_lifetime: Duration,
 
+    pub out: Option<Out>,
+
     #[serde(default = "default::log_level")]
     pub log_level: LevelFilter,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Out {
+    pub server: SocketAddr,
+
+    #[serde(deserialize_with = "deserialize_optional_bytes", default)]
+    pub username: Option<Vec<u8>>,
+
+    #[serde(deserialize_with = "deserialize_optional_bytes", default)]
+    pub password: Option<Vec<u8>>,
+}
+
+impl Out {
+    fn check(&self) -> Result<(), ConfigError> {
+        if (self.username.is_some() && self.password.is_none())
+            || (self.username.is_none() && self.password.is_some())
+        {
+            return Err(ConfigError::InvalidSocks5Auth);
+        }
+        Ok(())
+    }
+
+    pub fn get_auth(self) -> Option<(Vec<u8>, Vec<u8>)> {
+        if self.username.is_some() {
+            return Some((self.username.unwrap(), self.password.unwrap()));
+        }
+        return None;
+    }
 }
 
 impl Config {
@@ -119,7 +151,11 @@ impl Config {
         }
 
         let file = File::open(path.unwrap())?;
-        Ok(serde_json::from_reader(file)?)
+        let cfg: Config = serde_json::from_reader(file)?;
+        if let Some(out) = &cfg.out {
+            out.check()?
+        }
+        Ok(cfg)
     }
 }
 
@@ -215,6 +251,14 @@ where
     Ok(s.into_iter().map(|alpn| alpn.into_bytes()).collect())
 }
 
+pub fn deserialize_optional_bytes<'de, D>(deserializer: D) -> Result<Option<Vec<u8>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    Ok(Some(s.into_bytes()))
+}
+
 pub fn deserialize_duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
 where
     D: Deserializer<'de>,
@@ -240,4 +284,6 @@ pub enum ConfigError {
     Io(#[from] IoError),
     #[error(transparent)]
     Serde(#[from] SerdeError),
+    #[error("invalid socks5 authentication")]
+    InvalidSocks5Auth,
 }

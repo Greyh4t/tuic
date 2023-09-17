@@ -2,6 +2,7 @@ use crate::{
     config::Config,
     connection::{Connection, DEFAULT_CONCURRENT_STREAMS},
     error::Error,
+    socks5,
     utils::{self, CongestionControl},
 };
 use quinn::{
@@ -32,6 +33,10 @@ pub struct Server {
 
 impl Server {
     pub fn init(cfg: Config) -> Result<Self, Error> {
+        if let Some(out) = cfg.out {
+            socks5::set_config(out.server, out.get_auth());
+        }
+
         let certs = utils::load_certs(cfg.certificate)?;
         let priv_key = utils::load_priv_key(cfg.private_key)?;
 

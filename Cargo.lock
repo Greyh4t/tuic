@@ -663,6 +663,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "socks5-proto"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c7216e2046a0bd0aa4c4170dab8e7b918e5f1230031abe9a62dc3da47a40543"
+dependencies = [
+ "bytes",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "socks5-server"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -670,7 +681,7 @@ checksum = "cd7260a3af0411620eca9c63032069ec9f0d92ef4214e017672c864f573d6a21"
 dependencies = [
  "async-trait",
  "bytes",
- "socks5-proto",
+ "socks5-proto 0.3.3",
  "tokio",
 ]
 
@@ -846,7 +857,7 @@ dependencies = [
  "serde",
  "serde_json",
  "socket2 0.5.3",
- "socks5-proto",
+ "socks5-proto 0.3.3",
  "socks5-server",
  "thiserror",
  "tokio",
@@ -878,6 +889,7 @@ dependencies = [
  "humantime",
  "lexopt",
  "log",
+ "once_cell",
  "parking_lot",
  "quinn",
  "register-count",
@@ -886,6 +898,7 @@ dependencies = [
  "serde",
  "serde_json",
  "socket2 0.5.3",
+ "socks5-proto 0.4.0",
  "thiserror",
  "tokio",
  "tokio-util",

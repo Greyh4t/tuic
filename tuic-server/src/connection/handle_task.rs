@@ -1,6 +1,7 @@
 use super::{Connection, UdpSession, ERROR_CODE};
-use crate::{error::Error, utils::UdpRelayMode};
+use crate::{error::Error, socks5, utils::UdpRelayMode};
 use bytes::Bytes;
+use socks5_proto::Address as socks5Addr;
 use std::{
     collections::hash_map::Entry,
     io::{Error as IoError, ErrorKind},
@@ -39,19 +40,38 @@ impl Connection {
             let mut stream = None;
             let mut last_err = None;
 
-            match resolve_dns(conn.addr()).await {
-                Ok(addrs) => {
-                    for addr in addrs {
-                        match TcpStream::connect(addr).await {
-                            Ok(s) => {
-                                stream = Some(s);
-                                break;
+            if !socks5::is_inited() {
+                match resolve_dns(conn.addr()).await {
+                    Ok(addrs) => {
+                        for addr in addrs {
+                            match TcpStream::connect(addr).await {
+                                Ok(s) => {
+                                    stream = Some(s);
+                                    break;
+                                }
+                                Err(err) => last_err = Some(err),
                             }
-                            Err(err) => last_err = Some(err),
                         }
                     }
+                    Err(err) => last_err = Some(err),
                 }
-                Err(err) => last_err = Some(err),
+            } else {
+                let addr = match conn.addr() {
+                    Address::None => Err(IoError::new(ErrorKind::InvalidInput, "empty address")),
+                    Address::DomainAddress(domain, port) => Ok(socks5Addr::DomainAddress(
+                        domain.clone().into_bytes(),
+                        *port,
+                    )),
+                    Address::SocketAddress(addr) => Ok(socks5Addr::SocketAddress(*addr)),
+                }?;
+                match socks5::connect(addr).await {
+                    Ok(s) => {
+                        stream = Some(s);
+                    }
+                    Err(err) => {
+                        log::error!("{}", err);
+                    }
+                }
             }
 
             if let Some(mut stream) = stream {
@@ -134,7 +154,10 @@ impl Connection {
             };
 
             let Some(socket_addr) = resolve_dns(&addr).await?.next() else {
-                return Err(Error::from(IoError::new(ErrorKind::NotFound, "no address resolved")));
+                return Err(Error::from(IoError::new(
+                    ErrorKind::NotFound,
+                    "no address resolved",
+                )));
             };
 
             session.send(pkt, socket_addr).await

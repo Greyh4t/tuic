@@ -9,6 +9,7 @@ mod config;
 mod connection;
 mod error;
 mod server;
+mod socks5;
 mod utils;
 
 #[tokio::main]
