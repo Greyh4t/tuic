@@ -1,5 +1,5 @@
 use self::{authenticated::Authenticated, udp_session::UdpSession};
-use crate::{error::Error, utils::UdpRelayMode};
+use crate::{error::Error, socks5::Socks5, utils::UdpRelayMode};
 use crossbeam_utils::atomic::AtomicCell;
 use parking_lot::Mutex;
 use quinn::{Connecting, Connection as QuinnConnection, VarInt};
@@ -36,6 +36,7 @@ pub struct Connection {
     remote_bi_stream_cnt: Counter,
     max_concurrent_uni_streams: Arc<AtomicU32>,
     max_concurrent_bi_streams: Arc<AtomicU32>,
+    out: Option<Socks5>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -50,6 +51,7 @@ impl Connection {
         max_external_pkt_size: usize,
         gc_interval: Duration,
         gc_lifetime: Duration,
+        out: Option<Socks5>,
     ) {
         let addr = conn.remote_address();
 
@@ -69,6 +71,7 @@ impl Connection {
                 udp_relay_ipv6,
                 task_negotiation_timeout,
                 max_external_pkt_size,
+                out,
             ))
         };
 
@@ -139,6 +142,7 @@ impl Connection {
         udp_relay_ipv6: bool,
         task_negotiation_timeout: Duration,
         max_external_pkt_size: usize,
+        out: Option<Socks5>,
     ) -> Self {
         Self {
             inner: conn.clone(),
@@ -154,6 +158,7 @@ impl Connection {
             remote_bi_stream_cnt: Counter::new(),
             max_concurrent_uni_streams: Arc::new(AtomicU32::new(DEFAULT_CONCURRENT_STREAMS)),
             max_concurrent_bi_streams: Arc::new(AtomicU32::new(DEFAULT_CONCURRENT_STREAMS)),
+            out,
         }
     }
 

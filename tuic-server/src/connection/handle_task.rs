@@ -1,5 +1,5 @@
 use super::{Connection, UdpSession, ERROR_CODE};
-use crate::{error::Error, socks5, utils::UdpRelayMode};
+use crate::{error::Error, utils::UdpRelayMode};
 use bytes::Bytes;
 use socks5_proto::Address as socks5Addr;
 use std::{
@@ -40,7 +40,24 @@ impl Connection {
             let mut stream = None;
             let mut last_err = None;
 
-            if !socks5::is_inited() {
+            if let Some(socks5) = self.out.as_ref() {
+                let addr = match conn.addr() {
+                    Address::None => Err(IoError::new(ErrorKind::InvalidInput, "empty address")),
+                    Address::DomainAddress(domain, port) => Ok(socks5Addr::DomainAddress(
+                        domain.clone().into_bytes(),
+                        *port,
+                    )),
+                    Address::SocketAddress(addr) => Ok(socks5Addr::SocketAddress(*addr)),
+                }?;
+                match socks5.connect(addr).await {
+                    Ok(s) => {
+                        stream = Some(s);
+                    }
+                    Err(err) => {
+                        log::error!("{}", err);
+                    }
+                }
+            } else {
                 match resolve_dns(conn.addr()).await {
                     Ok(addrs) => {
                         for addr in addrs {
@@ -54,23 +71,6 @@ impl Connection {
                         }
                     }
                     Err(err) => last_err = Some(err),
-                }
-            } else {
-                let addr = match conn.addr() {
-                    Address::None => Err(IoError::new(ErrorKind::InvalidInput, "empty address")),
-                    Address::DomainAddress(domain, port) => Ok(socks5Addr::DomainAddress(
-                        domain.clone().into_bytes(),
-                        *port,
-                    )),
-                    Address::SocketAddress(addr) => Ok(socks5Addr::SocketAddress(*addr)),
-                }?;
-                match socks5::connect(addr).await {
-                    Ok(s) => {
-                        stream = Some(s);
-                    }
-                    Err(err) => {
-                        log::error!("{}", err);
-                    }
                 }
             }
 

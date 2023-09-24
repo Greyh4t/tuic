@@ -106,24 +106,6 @@ pub struct Out {
     pub password: Option<Vec<u8>>,
 }
 
-impl Out {
-    fn check(&self) -> Result<(), ConfigError> {
-        if (self.username.is_some() && self.password.is_none())
-            || (self.username.is_none() && self.password.is_some())
-        {
-            return Err(ConfigError::InvalidSocks5Auth);
-        }
-        Ok(())
-    }
-
-    pub fn get_auth(self) -> Option<(Vec<u8>, Vec<u8>)> {
-        if self.username.is_some() {
-            return Some((self.username.unwrap(), self.password.unwrap()));
-        }
-        return None;
-    }
-}
-
 impl Config {
     pub fn parse(args: ArgsOs) -> Result<Self, ConfigError> {
         let mut parser = Parser::from_iter(args);
@@ -151,11 +133,7 @@ impl Config {
         }
 
         let file = File::open(path.unwrap())?;
-        let cfg: Config = serde_json::from_reader(file)?;
-        if let Some(out) = &cfg.out {
-            out.check()?
-        }
-        Ok(cfg)
+        Ok(serde_json::from_reader(file)?)
     }
 }
 
@@ -284,6 +262,4 @@ pub enum ConfigError {
     Io(#[from] IoError),
     #[error(transparent)]
     Serde(#[from] SerdeError),
-    #[error("invalid socks5 authentication")]
-    InvalidSocks5Auth,
 }

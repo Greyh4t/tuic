@@ -2,7 +2,7 @@ use crate::{
     config::Config,
     connection::{Connection, DEFAULT_CONCURRENT_STREAMS},
     error::Error,
-    socks5,
+    socks5::Socks5,
     utils::{self, CongestionControl},
 };
 use quinn::{
@@ -29,14 +29,11 @@ pub struct Server {
     max_external_pkt_size: usize,
     gc_interval: Duration,
     gc_lifetime: Duration,
+    out: Option<Socks5>,
 }
 
 impl Server {
     pub fn init(cfg: Config) -> Result<Self, Error> {
-        if let Some(out) = cfg.out {
-            socks5::set_config(out.server, out.get_auth());
-        }
-
         let certs = utils::load_certs(cfg.certificate)?;
         let priv_key = utils::load_priv_key(cfg.private_key)?;
 
@@ -107,6 +104,11 @@ impl Server {
             Arc::new(TokioRuntime),
         )?;
 
+        let out: Option<Socks5> = cfg
+            .out
+            .map(|c| Socks5::new(c.server, c.username, c.password))
+            .transpose()?;
+
         Ok(Self {
             ep,
             users: Arc::new(cfg.users),
@@ -117,6 +119,7 @@ impl Server {
             max_external_pkt_size: cfg.max_external_packet_size,
             gc_interval: cfg.gc_interval,
             gc_lifetime: cfg.gc_lifetime,
+            out: out,
         })
     }
 
@@ -141,6 +144,7 @@ impl Server {
                 self.max_external_pkt_size,
                 self.gc_interval,
                 self.gc_lifetime,
+                self.out.clone(),
             ));
         }
     }

@@ -31,6 +31,8 @@ pub enum Error {
     TaskNegotiationTimeout,
     #[error("failed sending packet to {0}: relaying IPv6 UDP packet is disabled")]
     UdpRelayIpv6Disabled(SocketAddr),
+    #[error("invalid socks5 authentication")]
+    InvalidSocks5Auth,
 }
 
 impl Error {
